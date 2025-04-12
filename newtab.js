@@ -342,22 +342,22 @@ function filterOpenTabsList(filterText) { // (Unchanged)
 
 
 // --- Collection Card Creation & Actions (Using Combined Handlers) ---
+// --- Inside newtab.js ---
+
 function createCollectionCard(collection) {
     const card = document.createElement('div');
     card.className = 'collection-card';
-    card.dataset.collectionId = collection.id;
+    card.dataset.collectionId = collection.id; // Keep the ID reference
 
-    // *** Make the CARD itself draggable for reordering ***
+    // ... (draggable setup, event listeners for drag/drop/etc.) ...
     card.draggable = true;
-    card.addEventListener('dragstart', handleCollectionDragStart); // For starting REORDER drag
-    card.addEventListener('dragend', handleCollectionDragEnd);     // For ending REORDER drag
+    card.addEventListener('dragstart', handleCollectionDragStart);
+    card.addEventListener('dragend', handleCollectionDragEnd);
+    card.addEventListener('dragover', handleCardDragOver);
+    card.addEventListener('dragleave', handleCardDragLeave);
+    card.addEventListener('drop', handleCardDrop);
 
-    // *** ADD COMBINED Listeners for Drag Over, Leave, and Drop ***
-    card.addEventListener('dragover', handleCardDragOver);   // Combined handler
-    card.addEventListener('dragleave', handleCardDragLeave); // Combined handler
-    card.addEventListener('drop', handleCardDrop);         // Combined handler
-
-    // --- Card Content (remains the same logic) ---
+    // --- Card Content ---
     const title = document.createElement('h2');
     title.textContent = collection.name;
     card.appendChild(title);
@@ -372,54 +372,75 @@ function createCollectionCard(collection) {
     tabList.className = 'tab-list';
     card.appendChild(tabList);
 
-    const tabsToShow = collection.tabs || [];
-    let showHideToggle = null;
+    // No need for 'tabsToShow' variable here anymore within this outer scope
 
-    const renderTabs = (showAll = false) => { // Render tabs logic unchanged
-        tabList.innerHTML = '';
-        const limit = showAll ? tabsToShow.length : TABS_TO_SHOW_INITIALLY;
-        const visibleTabs = tabsToShow.slice(0, limit);
+    let showHideToggle = null; // Keep track of the button
 
-        if (tabsToShow.length === 0) {
+    // --- Modify renderTabs function ---
+    const renderTabs = (showAll = false) => {
+        // <<< FIX: Get the LATEST collection data from the global array >>>
+        const currentCollectionData = allCollections.find(c => c.id === card.dataset.collectionId);
+        const latestTabsToShow = currentCollectionData ? (currentCollectionData.tabs || []) : [];
+        // <<< END FIX >>>
+
+        tabList.innerHTML = ''; // Clear previous items
+        const limit = showAll ? latestTabsToShow.length : TABS_TO_SHOW_INITIALLY;
+        const visibleTabs = latestTabsToShow.slice(0, limit);
+
+        if (latestTabsToShow.length === 0) { // Use latestTabsToShow
             tabList.innerHTML = '<li class="empty-collection-msg">This collection is empty.</li>';
         } else {
             visibleTabs.forEach(tab => {
                  if (tab && typeof tab === 'object' && tab.url) {
-                    const li = createSavedTabListItem(tab, collection.id);
+                    // Pass collection.id (or card.dataset.collectionId) to the item creator
+                    const li = createSavedTabListItem(tab, card.dataset.collectionId);
                     tabList.appendChild(li);
-                 } else { console.warn('[Warn] Skipping invalid tab data:', collection.id, tab); }
+                 } else { console.warn('[Warn] Skipping invalid tab data:', card.dataset.collectionId, tab); }
             });
         }
 
-        if (showHideToggle && showHideToggle.parentNode) { showHideToggle.remove(); showHideToggle = null; }
-        if (tabsToShow.length > TABS_TO_SHOW_INITIALLY) {
+        // --- Show/Hide Button Logic (using latestTabsToShow) ---
+        if (showHideToggle && showHideToggle.parentNode) { // Remove existing button first
+             showHideToggle.remove();
+             showHideToggle = null;
+        }
+        if (latestTabsToShow.length > TABS_TO_SHOW_INITIALLY) {
             showHideToggle = document.createElement('button');
             showHideToggle.className = 'toggle-tabs-btn';
-            showHideToggle.textContent = showAll ? `Show Less` : `Show All (${tabsToShow.length})`;
+            showHideToggle.textContent = showAll ? `Show Less` : `Show All (${latestTabsToShow.length})`;
             showHideToggle.setAttribute('aria-expanded', showAll.toString());
             const nextShowAllState = !showAll;
+            // Make sure the click handler calls this same renderTabs instance
             showHideToggle.onclick = (e) => { e.stopPropagation(); renderTabs(nextShowAllState); };
+            // Insert AFTER the tabList
             tabList.insertAdjacentElement('afterend', showHideToggle);
         }
-        updateCardActionCounts(card, tabsToShow.length);
+        // --- Update counts based on latestTabsToShow ---
+        updateCardActionCounts(card, latestTabsToShow.length);
     };
+    // --- Store the function ---
     card.__renderTabsFunc = renderTabs;
 
-    renderTabs(false);
+    // --- Initial render call ---
+    renderTabs(false); // Call it once to populate initially
 
-    const buttonGroup = document.createElement('div'); // Button logic unchanged
+    // --- Card Actions (Button Group) ---
+    const buttonGroup = document.createElement('div');
     buttonGroup.className = 'card-actions';
     const openAllButton = document.createElement('button');
     openAllButton.className = 'button open-all-btn';
+    // Pass the original collection object to openCollection, it only needs the tabs from that snapshot
     openAllButton.addEventListener('click', (e) => { e.stopPropagation(); openCollection(collection); });
     buttonGroup.appendChild(openAllButton);
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete Collection';
     deleteButton.className = 'button delete-btn';
-    deleteButton.addEventListener('click', (e) => { e.stopPropagation(); deleteCollection(collection.id, collection.name); });
+    // Pass the ID and name for deletion confirmation
+    deleteButton.addEventListener('click', (e) => { e.stopPropagation(); deleteCollection(card.dataset.collectionId, collection.name); });
     buttonGroup.appendChild(deleteButton);
     card.appendChild(buttonGroup);
-    updateCardActionCounts(card, tabsToShow.length);
+    // Update counts initially (renderTabs already does this, but good for safety)
+    updateCardActionCounts(card, (collection.tabs || []).length);
 
     return card;
 }
