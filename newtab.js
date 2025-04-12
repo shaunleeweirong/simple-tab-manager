@@ -1,4 +1,4 @@
-// newtab.js (Complete Code - Combined Event Handlers Version)
+// newtab.js (Full Code with Collection Name Editing)
 
 // --- Element References ---
 const collectionsContainer = document.getElementById('collectionsContainer');
@@ -11,121 +11,85 @@ const openTabsList = document.getElementById('openTabsList');
 const saveOpenTabsBtn = document.getElementById('saveOpenTabsBtn');
 const closeOpenTabsCheckbox = document.getElementById('closeOpenTabsCheckbox');
 const sidebarStatusDiv = document.getElementById('sidebarStatus');
+const addNewCollectionBtn = document.getElementById('addNewCollectionBtn');
 // Popup Elements
 const instructionsPopup = document.getElementById('instructionsPopup');
 const showInstructionsBtn = document.getElementById('showInstructionsBtn');
 const popupCloseBtn = instructionsPopup ? instructionsPopup.querySelector('.popup-close-btn') : null;
 
-console.log('[Debug] Getting search input element...');
-console.log('[Debug] Search Input Element found:', searchInput);
-console.log('[Debug] Open Tabs List Element found:', openTabsList);
-console.log('[Debug] Sidebar Save Button found:', saveOpenTabsBtn);
-console.log('[Debug] Popup elements found:', { instructionsPopup, showInstructionsBtn, popupCloseBtn });
-
-
 // --- Configuration & State ---
 const TABS_TO_SHOW_INITIALLY = 5;
-let allCollections = []; // Stores all fetched collections IN THEIR PERSISTED ORDER
-let currentFilter = ''; // Stores the current search term
-let currentWindowId = null; // Store current window ID
-let draggedCollectionId = null; // Store the ID of the collection being dragged for reordering
+let allCollections = [];
+let currentFilter = '';
+let currentWindowId = null;
+let draggedCollectionId = null;
 
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', initializeNewTabPage);
 
 if (searchInput) {
-    console.log('[Debug] Attaching search listener to element:', searchInput);
     searchInput.addEventListener('input', handleSearchInput);
 } else {
-    console.error('[Error] !!! Search input element with ID "searchInput" was NOT FOUND. Check HTML ID.');
+    console.error('[Error] Search input #searchInput NOT FOUND.');
 }
-
-// Listener for sidebar save button
 if (saveOpenTabsBtn) {
     saveOpenTabsBtn.addEventListener('click', handleSaveOpenTabs);
 } else {
      console.error('[Error] Sidebar Save button #saveOpenTabsBtn not found.');
 }
-
-// Popup Listeners
-if (showInstructionsBtn && instructionsPopup) {
-    showInstructionsBtn.addEventListener('click', () => {
-        instructionsPopup.classList.remove('hidden');
-    });
+if (addNewCollectionBtn) {
+    addNewCollectionBtn.addEventListener('click', handleAddNewCollection);
 } else {
-    console.warn('[Warn] Instructions button or popup element not found.');
+    console.error('[Error] Add New Collection button #addNewCollectionBtn not found.');
 }
-
+if (showInstructionsBtn && instructionsPopup) {
+    showInstructionsBtn.addEventListener('click', () => instructionsPopup.classList.remove('hidden'));
+}
 if (popupCloseBtn && instructionsPopup) {
-    popupCloseBtn.addEventListener('click', () => {
-        instructionsPopup.classList.add('hidden');
-    });
+    popupCloseBtn.addEventListener('click', () => instructionsPopup.classList.add('hidden'));
 }
-
 if (instructionsPopup) {
-    // Close popup if overlay background is clicked
     instructionsPopup.addEventListener('click', (event) => {
-        if (event.target === instructionsPopup) {
-            instructionsPopup.classList.add('hidden');
-        }
+        if (event.target === instructionsPopup) instructionsPopup.classList.add('hidden');
     });
 }
-
-// Optional: Close popup with Escape key
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && instructionsPopup && !instructionsPopup.classList.contains('hidden')) {
         instructionsPopup.classList.add('hidden');
     }
 });
 
-
 // --- Initialization ---
 async function initializeNewTabPage() {
     console.log('[Debug] Initializing New Tab Page...');
-    // Get current window ID first
     try {
         const window = await chrome.windows.getCurrent({ populate: false });
         currentWindowId = window.id;
-        console.log('[Debug] Current Window ID:', currentWindowId);
     } catch (error) {
          console.error('[Error] Could not get current window:', error);
          if (openTabsList) openTabsList.innerHTML = '<li class="state-message error">Could not get window info.</li>';
     }
-
-    // Load saved collections (async) - Order will come from storage now
     await loadInitialCollections();
-
-    // Load open tabs if we have the necessary info (async)
     if(currentWindowId && openTabsList) {
        await displayOpenTabs();
-    } else {
-        if (openTabsList) openTabsList.innerHTML = '<li class="state-message error">Could not load open tabs.</li>';
+    } else if (openTabsList) {
+        openTabsList.innerHTML = '<li class="state-message error">Could not load open tabs.</li>';
     }
-
     console.log('[Debug] Initialization complete.');
 }
 
-
 // --- Core Collection Functions ---
-
 async function loadInitialCollections() {
     console.log('[Debug] loadInitialCollections called');
     loadingMessage.style.display = 'block';
     emptyStateMessage.style.display = 'none';
     noResultsMessage.style.display = 'none';
     Array.from(collectionsContainer.querySelectorAll('.collection-card')).forEach(card => card.remove());
-
     try {
         const data = await chrome.storage.local.get('tabCollections');
-        console.log('[Debug] Data fetched from storage:', data);
-        allCollections = data.tabCollections || []; // The order here IS the order from storage
-        console.log('[Debug] Collections loaded (IDs):', JSON.stringify(allCollections.map(c => c.id)));
-
-        // REMOVED the sort by createdAt. The order loaded from storage is now the source of truth.
-
+        allCollections = data.tabCollections || [];
         loadingMessage.style.display = 'none';
         displayCollections(filterCollections(allCollections, currentFilter));
-
     } catch (error) {
         console.error('[Error] Error loading collections:', error);
         loadingMessage.textContent = 'Error loading collections.';
@@ -136,100 +100,69 @@ async function loadInitialCollections() {
 }
 
 function handleSearchInput() {
-    console.log('[Debug] handleSearchInput triggered!');
     if (!searchInput) return;
     currentFilter = searchInput.value.toLowerCase().trim();
-    console.log('[Debug] Current Filter Text:', currentFilter);
-
     const filteredCollections = filterCollections(allCollections, currentFilter);
-    console.log('[Debug] Filtered Collections Count:', filteredCollections.length);
-    displayCollections(filteredCollections); // Display based on filter
-
+    displayCollections(filteredCollections);
     if (openTabsList) { filterOpenTabsList(currentFilter); }
 }
 
 function filterCollections(collections, filterText) {
     if (!filterText) { return collections; }
     const lowerCaseFilterText = filterText.toLowerCase();
-
-    return collections.filter(collection => {
-        const nameMatch = collection.name && collection.name.toLowerCase().includes(lowerCaseFilterText);
-        if (nameMatch) return true;
-        return (collection.tabs || []).some(tab =>
+    return collections.filter(collection =>
+        (collection.name && collection.name.toLowerCase().includes(lowerCaseFilterText)) ||
+        (collection.tabs || []).some(tab =>
             (tab.title && tab.title.toLowerCase().includes(lowerCaseFilterText)) ||
             (tab.url && tab.url.toLowerCase().includes(lowerCaseFilterText))
-        );
-    });
+        )
+    );
 }
 
 function displayCollections(collectionsToDisplay) {
-    console.log('[Debug] displayCollections called with', collectionsToDisplay.length, 'items');
-    console.log('[Debug] Displaying order (IDs):', JSON.stringify(collectionsToDisplay.map(c => c.id)));
-    // Store scroll position before clearing
     const scrollY = window.scrollY;
-
-    // Clear only the cards, keep messages
     Array.from(collectionsContainer.querySelectorAll('.collection-card')).forEach(card => card.remove());
 
     // Ensure message elements exist and are positioned correctly
     if (!document.getElementById('loadingMessage')) collectionsContainer.prepend(loadingMessage);
-    if (!document.getElementById('emptyStateMessage')) collectionsContainer.appendChild(emptyStateMessage); // Append messages after cards
+    if (!document.getElementById('emptyStateMessage')) collectionsContainer.appendChild(emptyStateMessage);
     if (!document.getElementById('noResultsMessage')) collectionsContainer.appendChild(noResultsMessage);
 
     emptyStateMessage.style.display = 'none';
     noResultsMessage.style.display = 'none';
     loadingMessage.style.display = 'none';
 
-    // Determine which message to show based on the *original* unfiltered data and filter state
     if (allCollections.length === 0 && !currentFilter) {
         emptyStateMessage.style.display = 'block';
-        console.log('[Debug] Displaying: Empty State (No collections saved)');
     } else if (collectionsToDisplay.length === 0 && currentFilter) {
         noResultsMessage.style.display = 'block';
-        console.log('[Debug] Displaying: No Results Message');
     } else if (collectionsToDisplay.length > 0) {
-        console.log('[Debug] Rendering collection cards...');
         collectionsToDisplay.forEach(collection => {
             if (collection && collection.id && collection.name) {
                  const card = createCollectionCard(collection);
-                 // Insert cards *before* the empty state message placeholder
                  collectionsContainer.insertBefore(card, emptyStateMessage);
             } else {
                  console.warn('[Warn] Skipping invalid collection object:', collection);
             }
         });
     } else {
-         // This case might occur if all collections exist but are filtered out
-         console.log('[Debug] Displaying: Nothing (all collections filtered out or empty)');
-         // Check again just in case
          if (allCollections.length === 0) {
             emptyStateMessage.style.display = 'block';
          }
     }
-    // Restore scroll position
     window.scrollTo(0, scrollY);
 }
 
-
-// --- Open Tabs Display Logic (DRAG SOURCE) ---
-
-async function displayOpenTabs() { // (Unchanged)
-    if (!openTabsList || !currentWindowId) {
-        console.warn('[Warn] Cannot display open tabs. List element or Window ID missing.');
-        return;
-    }
-    console.log('[Debug] displayOpenTabs called for window:', currentWindowId);
+// --- Open Tabs Display Logic ---
+async function displayOpenTabs() {
+    if (!openTabsList || !currentWindowId) return;
     openTabsList.innerHTML = '<li class="state-message">Loading...</li>';
-
     try {
         const tabs = await chrome.tabs.query({ windowId: currentWindowId });
-        openTabsList.innerHTML = ''; // Clear loading/previous tabs
-
+        openTabsList.innerHTML = '';
         if (!tabs || tabs.length === 0) {
-            openTabsList.innerHTML = '<li class="state-message">No open tabs found in this window.</li>';
-            return;
+            openTabsList.innerHTML = '<li class="state-message">No open tabs found.</li>'; return;
         }
-
         let displayedCount = 0;
         tabs.forEach(tab => {
             if (tab.url && !tab.url.startsWith('chrome://newtab') && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
@@ -238,94 +171,68 @@ async function displayOpenTabs() { // (Unchanged)
                 displayedCount++;
             }
         });
-
         if (displayedCount === 0) {
-             openTabsList.innerHTML = '<li class="state-message">No relevant open tabs to display.</li>';
+             openTabsList.innerHTML = '<li class="state-message">No relevant tabs.</li>';
         }
-        console.log('[Debug] Displayed', displayedCount, 'open tabs.');
-
     } catch (error) {
-        console.error('[Error] Failed to query or display open tabs:', error);
-        openTabsList.innerHTML = '<li class="state-message error">Error loading open tabs.</li>';
+        console.error('[Error] Failed to display open tabs:', error);
+        openTabsList.innerHTML = '<li class="state-message error">Error loading tabs.</li>';
     }
 }
 
-// Create LI element for open tab, make it draggable
-function createOpenTabListItem(tab) { // (Unchanged)
+function createOpenTabListItem(tab) {
     const li = document.createElement('li');
     li.className = 'open-tab-item';
     li.dataset.url = tab.url || '#';
     li.dataset.title = tab.title || tab.url || 'Untitled Tab';
     li.dataset.favIconUrl = tab.favIconUrl || 'icons/icon16.png';
-
-    // Make draggable and add listeners
     li.draggable = true;
     li.addEventListener('dragstart', handleOpenTabDragStart);
     li.addEventListener('dragend', handleOpenTabDragEnd);
 
-    // Add Favicon
     const img = document.createElement('img');
     img.className = 'favicon';
     img.src = li.dataset.favIconUrl;
     img.alt = '';
     img.loading = 'lazy';
-    img.onerror = function() {
-        this.src = 'icons/icon16.png';
-        this.classList.add('favicon-fallback');
-    };
+    img.onerror = function() { this.src = 'icons/icon16.png'; this.classList.add('favicon-fallback'); };
     li.appendChild(img);
 
-    // Add Title
     const span = document.createElement('span');
     span.className = 'open-tab-title';
     span.textContent = li.dataset.title;
     span.title = `${li.dataset.title}\n${li.dataset.url}`;
     li.appendChild(span);
-
     return li;
 }
 
 // --- Drag Handlers for Open Tabs ---
-function handleOpenTabDragStart(event) { // (Unchanged)
+function handleOpenTabDragStart(event) {
     const li = event.currentTarget;
-    console.log('[Drag] Starting drag for tab:', li.dataset.title);
-
-    const tabData = {
-        url: li.dataset.url,
-        title: li.dataset.title,
-        favIconUrl: li.dataset.favIconUrl
-    };
+    const tabData = { url: li.dataset.url, title: li.dataset.title, favIconUrl: li.dataset.favIconUrl };
     event.dataTransfer.setData('application/vnd.tabmanager.tab+json', JSON.stringify(tabData));
     event.dataTransfer.effectAllowed = 'copy';
-
     setTimeout(() => li.classList.add('dragging-tab'), 0);
 }
-
-function handleOpenTabDragEnd(event) { // (Unchanged - relies on combined leave/end handlers now)
-    console.log('[Drag] Ending drag for tab:', event.currentTarget.dataset.title);
+function handleOpenTabDragEnd(event) {
     event.currentTarget.classList.remove('dragging-tab');
-    // Highlights are removed in handleCardDragLeave and handleCollectionDragEnd
 }
 
-
 // --- Filtering for Open Tabs List ---
-function filterOpenTabsList(filterText) { // (Unchanged)
+function filterOpenTabsList(filterText) {
     if (!openTabsList) return;
     const lowerCaseFilterText = filterText.toLowerCase();
     const items = openTabsList.querySelectorAll('.open-tab-item');
     let hasVisibleItems = false;
-
     items.forEach(item => {
         const title = (item.dataset.title || '').toLowerCase();
         const url = (item.dataset.url || '').toLowerCase();
         if (title.includes(lowerCaseFilterText) || url.includes(lowerCaseFilterText)) {
-            item.style.display = '';
-            hasVisibleItems = true;
+            item.style.display = ''; hasVisibleItems = true;
         } else {
             item.style.display = 'none';
         }
     });
-
     let noResultsMsg = openTabsList.querySelector('.state-message.no-results');
     if (!hasVisibleItems && filterText) {
         if (!noResultsMsg) {
@@ -340,16 +247,11 @@ function filterOpenTabsList(filterText) { // (Unchanged)
     }
 }
 
-
-// --- Collection Card Creation & Actions (Using Combined Handlers) ---
-// --- Inside newtab.js ---
-
+// --- Collection Card Creation & Actions ---
 function createCollectionCard(collection) {
     const card = document.createElement('div');
     card.className = 'collection-card';
-    card.dataset.collectionId = collection.id; // Keep the ID reference
-
-    // ... (draggable setup, event listeners for drag/drop/etc.) ...
+    card.dataset.collectionId = collection.id;
     card.draggable = true;
     card.addEventListener('dragstart', handleCollectionDragStart);
     card.addEventListener('dragend', handleCollectionDragEnd);
@@ -357,9 +259,10 @@ function createCollectionCard(collection) {
     card.addEventListener('dragleave', handleCardDragLeave);
     card.addEventListener('drop', handleCardDrop);
 
-    // --- Card Content ---
     const title = document.createElement('h2');
     title.textContent = collection.name;
+    // **** ADD DBLCLICK LISTENER FOR EDITING ****
+    title.addEventListener('dblclick', handleEditCollectionNameStart);
     card.appendChild(title);
 
     const timestamp = document.createElement('p');
@@ -371,95 +274,68 @@ function createCollectionCard(collection) {
     const tabList = document.createElement('ul');
     tabList.className = 'tab-list';
     card.appendChild(tabList);
+    let showHideToggle = null;
 
-    // No need for 'tabsToShow' variable here anymore within this outer scope
-
-    let showHideToggle = null; // Keep track of the button
-
-    // --- Modify renderTabs function ---
     const renderTabs = (showAll = false) => {
-        // <<< FIX: Get the LATEST collection data from the global array >>>
         const currentCollectionData = allCollections.find(c => c.id === card.dataset.collectionId);
         const latestTabsToShow = currentCollectionData ? (currentCollectionData.tabs || []) : [];
-        // <<< END FIX >>>
-
-        tabList.innerHTML = ''; // Clear previous items
+        tabList.innerHTML = '';
         const limit = showAll ? latestTabsToShow.length : TABS_TO_SHOW_INITIALLY;
         const visibleTabs = latestTabsToShow.slice(0, limit);
-
-        if (latestTabsToShow.length === 0) { // Use latestTabsToShow
+        if (latestTabsToShow.length === 0) {
             tabList.innerHTML = '<li class="empty-collection-msg">This collection is empty.</li>';
         } else {
             visibleTabs.forEach(tab => {
                  if (tab && typeof tab === 'object' && tab.url) {
-                    // Pass collection.id (or card.dataset.collectionId) to the item creator
                     const li = createSavedTabListItem(tab, card.dataset.collectionId);
                     tabList.appendChild(li);
                  } else { console.warn('[Warn] Skipping invalid tab data:', card.dataset.collectionId, tab); }
             });
         }
-
-        // --- Show/Hide Button Logic (using latestTabsToShow) ---
-        if (showHideToggle && showHideToggle.parentNode) { // Remove existing button first
-             showHideToggle.remove();
-             showHideToggle = null;
-        }
+        if (showHideToggle && showHideToggle.parentNode) { showHideToggle.remove(); showHideToggle = null; }
         if (latestTabsToShow.length > TABS_TO_SHOW_INITIALLY) {
             showHideToggle = document.createElement('button');
             showHideToggle.className = 'toggle-tabs-btn';
             showHideToggle.textContent = showAll ? `Show Less` : `Show All (${latestTabsToShow.length})`;
             showHideToggle.setAttribute('aria-expanded', showAll.toString());
             const nextShowAllState = !showAll;
-            // Make sure the click handler calls this same renderTabs instance
             showHideToggle.onclick = (e) => { e.stopPropagation(); renderTabs(nextShowAllState); };
-            // Insert AFTER the tabList
             tabList.insertAdjacentElement('afterend', showHideToggle);
         }
-        // --- Update counts based on latestTabsToShow ---
         updateCardActionCounts(card, latestTabsToShow.length);
     };
-    // --- Store the function ---
     card.__renderTabsFunc = renderTabs;
+    renderTabs(false);
 
-    // --- Initial render call ---
-    renderTabs(false); // Call it once to populate initially
-
-    // --- Card Actions (Button Group) ---
     const buttonGroup = document.createElement('div');
     buttonGroup.className = 'card-actions';
     const openAllButton = document.createElement('button');
     openAllButton.className = 'button open-all-btn';
-    // Pass the original collection object to openCollection, it only needs the tabs from that snapshot
     openAllButton.addEventListener('click', (e) => { e.stopPropagation(); openCollection(collection); });
     buttonGroup.appendChild(openAllButton);
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete Collection';
     deleteButton.className = 'button delete-btn';
-    // Pass the ID and name for deletion confirmation
     deleteButton.addEventListener('click', (e) => { e.stopPropagation(); deleteCollection(card.dataset.collectionId, collection.name); });
     buttonGroup.appendChild(deleteButton);
     card.appendChild(buttonGroup);
-    // Update counts initially (renderTabs already does this, but good for safety)
     updateCardActionCounts(card, (collection.tabs || []).length);
 
     return card;
 }
 
-
 // --- Helper to create LI for saved tabs ---
-function createSavedTabListItem(tab, collectionId) { // (Unchanged)
+function createSavedTabListItem(tab, collectionId) {
      const li = document.createElement('li');
      li.className = 'saved-tab-item';
      li.dataset.tabUrl = tab.url || '#';
      li.dataset.collectionId = collectionId;
-
      const img = document.createElement('img');
      img.className = 'favicon';
      img.src = tab.favIconUrl || 'icons/icon16.png';
      img.alt = '';
      img.onerror = function() { this.src = 'icons/icon16.png'; this.classList.add('favicon-fallback'); };
      li.appendChild(img);
-
      const linkContainer = document.createElement('span');
      linkContainer.className = 'tab-link-container';
      const a = document.createElement('a');
@@ -468,24 +344,21 @@ function createSavedTabListItem(tab, collectionId) { // (Unchanged)
      a.title = `${tab.title || 'No Title'}\n${tab.url || 'No URL'}`;
      a.target = '_blank';
      a.rel = 'noopener noreferrer';
-     a.addEventListener('dblclick', handleEditTabStart);
+     a.addEventListener('dblclick', handleEditTabStart); // Tab title edit
      linkContainer.appendChild(a);
      li.appendChild(linkContainer);
-
      const deleteBtn = document.createElement('button');
      deleteBtn.className = 'delete-tab-btn';
-     deleteBtn.textContent = 'x'; // Simple 'x'
+     deleteBtn.textContent = 'x';
      deleteBtn.title = 'Delete this tab';
      deleteBtn.setAttribute('aria-label', 'Delete this tab');
      deleteBtn.addEventListener('click', handleDeleteTab);
      li.appendChild(deleteBtn);
-
      return li;
 }
 
-
 // --- Helper to update counts in buttons ---
-function updateCardActionCounts(cardElement, count) { // (Unchanged)
+function updateCardActionCounts(cardElement, count) {
     const openAllBtn = cardElement.querySelector('.open-all-btn');
     if (openAllBtn) {
         openAllBtn.textContent = `Open All (${count})`;
@@ -493,535 +366,408 @@ function updateCardActionCounts(cardElement, count) { // (Unchanged)
     }
 }
 
-
 // --- Combined Drag/Drop Handlers for Cards ---
-
 function handleCardDragOver(event) {
     const targetCard = event.currentTarget;
     const targetId = targetCard.dataset.collectionId;
-
-    // CASE 1: Dragging a TAB over the card
     if (event.dataTransfer.types.includes('application/vnd.tabmanager.tab+json')) {
-        // console.log(`[CardDragOver] Tab drag detected over card ${targetId}`);
-        event.preventDefault(); // Allow drop for tabs
-        event.dataTransfer.dropEffect = 'copy';
-        targetCard.classList.add('drag-over-target'); // Use tab drop highlight
-        targetCard.classList.remove('collection-drag-over'); // Ensure reorder highlight is off
-    }
-    // CASE 2: Dragging a COLLECTION for reordering over a DIFFERENT card
-    else if (draggedCollectionId && targetId !== draggedCollectionId) {
-        // console.log(`[CardDragOver] Reorder drag detected over card ${targetId}. Currently dragged: ${draggedCollectionId}`);
-        event.preventDefault(); // Allow drop for reordering
-        event.dataTransfer.dropEffect = 'move';
-        targetCard.classList.add('collection-drag-over'); // Use reorder highlight
-        targetCard.classList.remove('drag-over-target'); // Ensure tab highlight is off
-    }
-    // CASE 3: Other drag types or dragging collection over itself
-    else {
-        // console.log(`[CardDragOver] Invalid drag over card ${targetId}. Dragged: ${draggedCollectionId}, Types: ${Array.from(event.dataTransfer.types)}`);
-        event.dataTransfer.dropEffect = 'none'; // Disallow drop
-        targetCard.classList.remove('drag-over-target', 'collection-drag-over'); // Remove all highlights
+        event.preventDefault(); event.dataTransfer.dropEffect = 'copy';
+        targetCard.classList.add('drag-over-target');
+        targetCard.classList.remove('collection-drag-over');
+    } else if (draggedCollectionId && targetId !== draggedCollectionId) {
+        event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+        targetCard.classList.add('collection-drag-over');
+        targetCard.classList.remove('drag-over-target');
+    } else {
+        event.dataTransfer.dropEffect = 'none';
+        targetCard.classList.remove('drag-over-target', 'collection-drag-over');
     }
 }
-
 function handleCardDragLeave(event) {
-    // Remove ALL potential highlights when leaving the card boundary
-    // console.log(`[CardDragLeave] Leaving card ${event.currentTarget.dataset.collectionId}`);
     event.currentTarget.classList.remove('drag-over-target', 'collection-drag-over');
 }
-
 async function handleCardDrop(event) {
     const targetCard = event.currentTarget;
     const targetId = targetCard.dataset.collectionId;
-    console.log(`[CardDrop] Drop detected on card ${targetId}. Dragged: ${draggedCollectionId}, Types: ${Array.from(event.dataTransfer.types)}`);
-
-    // Remove highlights regardless of drop type
     targetCard.classList.remove('drag-over-target', 'collection-drag-over');
 
-    // CASE 1: Dropping a TAB onto the card
+    // CASE 1: Drop Tab
     if (event.dataTransfer.types.includes('application/vnd.tabmanager.tab+json')) {
-        console.log(`[CardDrop] Processing TAB drop onto ${targetId}`);
-        event.preventDefault(); // Handle the drop
-        event.stopPropagation(); // Stop bubbling (important!)
-
+        event.preventDefault(); event.stopPropagation();
         const jsonData = event.dataTransfer.getData('application/vnd.tabmanager.tab+json');
-        if (!jsonData) { console.warn('[Drop Tab] No valid tab data found.'); return; }
-
+        if (!jsonData) return;
         let droppedTabData;
-        try {
-            droppedTabData = JSON.parse(jsonData);
-            if (!droppedTabData || typeof droppedTabData !== 'object' || !droppedTabData.url) throw new Error("Invalid data format.");
-        } catch (error) {
-            console.error('[Error] Failed to parse dropped tab data:', error); return;
-        }
+        try { droppedTabData = JSON.parse(jsonData); if (!droppedTabData?.url) throw "err"; }
+        catch (error) { console.error('[Error] Parsing dropped tab data:', error); return; }
 
-        // --- Add Tab to Collection Logic ---
         try {
-            const collectionIndex = allCollections.findIndex(c => c.id === targetId); // Use targetId here
+            const collectionIndex = allCollections.findIndex(c => c.id === targetId);
             if (collectionIndex === -1) throw new Error("Target collection not found.");
             const targetCollection = allCollections[collectionIndex];
-            if (!Array.isArray(targetCollection.tabs)) { targetCollection.tabs = []; }
-
-            const alreadyExists = targetCollection.tabs.some(tab => tab && tab.url === droppedTabData.url);
+            if (!Array.isArray(targetCollection.tabs)) targetCollection.tabs = [];
+            const alreadyExists = targetCollection.tabs.some(tab => tab?.url === droppedTabData.url);
             if (alreadyExists) {
-                console.log('[Drop Tab] Tab already exists:', droppedTabData.url);
                 targetCard.classList.add('drop-duplicate');
-                setTimeout(() => targetCard.classList.remove('drop-duplicate'), 1000);
-                return;
+                setTimeout(() => targetCard.classList.remove('drop-duplicate'), 1000); return;
             }
-
             const newTab = { url: droppedTabData.url, title: droppedTabData.title, favIconUrl: droppedTabData.favIconUrl };
             targetCollection.tabs.push(newTab);
-            console.log('[Drop Tab] Tab added in memory. New count:', targetCollection.tabs.length);
-
             await chrome.storage.local.set({ tabCollections: allCollections });
-            console.log('[Drop Tab] Storage updated.');
-
             const renderFunc = targetCard.__renderTabsFunc;
-            if (renderFunc) {
-                 const shouldShowAll = targetCard.querySelector('.toggle-tabs-btn')?.getAttribute('aria-expanded') === 'true';
-                 renderFunc(shouldShowAll);
-            } else { console.error("Render function not found on card!"); }
-
+            if (renderFunc) renderFunc(targetCard.querySelector('.toggle-tabs-btn')?.getAttribute('aria-expanded') === 'true');
+            else console.error("Render function not found on card!");
             targetCard.classList.add('drop-success');
             setTimeout(() => targetCard.classList.remove('drop-success'), 600);
-
-        } catch (error) {
-            console.error('[Error] Failed to handle tab drop logic:', error);
-            alert("An error occurred adding the tab.");
-        }
-        // --- End Add Tab Logic ---
+        } catch (error) { console.error('[Error] Handling tab drop:', error); alert("Error adding tab."); }
     }
-    // CASE 2: Dropping a COLLECTION for reordering
+    // CASE 2: Drop Collection for Reorder
     else if (draggedCollectionId && draggedCollectionId !== targetId) {
-        console.log(`[CardDrop] Processing REORDER drop. Moving ${draggedCollectionId} before ${targetId}`);
-        event.preventDefault(); // Handle the drop
-        event.stopPropagation(); // Stop bubbling
-
-        // --- Reorder Collection Logic ---
+        event.preventDefault(); event.stopPropagation();
         const draggedIndex = allCollections.findIndex(c => c.id === draggedCollectionId);
-        // Find original target index *before* modifying the array for logging/comparison
         const targetIndexOriginal = allCollections.findIndex(c => c.id === targetId);
-
-        if (draggedIndex === -1 || targetIndexOriginal === -1) {
-            console.error('[Error] Could not find dragged or target collection in array during drop.');
-            // Reset draggedCollectionId in dragend
-            return;
-        }
-
-        // 1. Remove the dragged item and store it
+        if (draggedIndex === -1 || targetIndexOriginal === -1) { console.error('Drag/target error'); return; }
         const [draggedItem] = allCollections.splice(draggedIndex, 1);
-
-        // 2. Find the target index *after* the dragged item has been removed
         const newTargetIndex = allCollections.findIndex(c => c.id === targetId);
-
-        if (newTargetIndex === -1) {
-             // This case means the target was somehow removed or mutated between finding it initially
-             // and finding it after splice. This shouldn't normally happen.
-             console.error("[Error] Target index became invalid after splice during drop. Aborting reorder.");
-             // Put the item back where it was to avoid losing it
-             allCollections.splice(draggedIndex, 0, draggedItem);
-             // Reset draggedCollectionId in dragend
-             return;
-        }
-
-        // 3. Insert the dragged item *before* the target item in its new position
+        if (newTargetIndex === -1) { console.error("Target index invalid post-splice"); allCollections.splice(draggedIndex, 0, draggedItem); return; }
         allCollections.splice(newTargetIndex, 0, draggedItem);
-        console.log(`[Drop Reorder] Moved item from original index ${draggedIndex} to new index ${newTargetIndex}`);
-        console.log('[Drop Reorder] New Order in memory (IDs):', JSON.stringify(allCollections.map(c => c.id)));
-
-
         try {
-            // 4. Save the newly ordered array to storage
             await chrome.storage.local.set({ tabCollections: allCollections });
-            console.log('[Drop Reorder] New collection order saved to storage.');
+            displayCollections(filterCollections(allCollections, currentFilter));
         } catch (error) {
-            console.error('[Error] Failed to save reordered collections:', error);
-            alert("Error saving the new collection order. Attempting to reload.");
-            // Attempt to revert in-memory change before reloading
+            console.error('[Error] Saving reordered collections:', error); alert("Error saving order.");
             const itemToRevert = allCollections.splice(newTargetIndex, 1)[0];
-            allCollections.splice(draggedIndex, 0, itemToRevert);
-            await loadInitialCollections(); // Reload as a recovery measure
-            // Reset draggedCollectionId in dragend
-            return;
+            allCollections.splice(draggedIndex, 0, itemToRevert); // Attempt revert
+            await loadInitialCollections(); // Recover
         }
-
-        // 5. Re-render the collections using the updated `allCollections` order, applying the current filter.
-        console.log('[Drop Reorder] Re-rendering collections with new order.');
-        displayCollections(filterCollections(allCollections, currentFilter)); // Re-render UI
-
-        // --- End Reorder Logic ---
-
-    } else {
-        console.log(`[CardDrop] Drop ignored. Dragged: ${draggedCollectionId}, Target: ${targetId}`);
     }
-
-    // NOTE: draggedCollectionId is reset in handleCollectionDragEnd
 }
 
-
-// --- Handlers for Collection Drag Start/End (Keep these separate) ---
-
+// --- Handlers for Collection Drag Start/End ---
 function handleCollectionDragStart(event) {
-    // Ensure we don't interfere if something inside the card initiated drag (like text selection)
-    const interactiveElement = event.target.closest('a, button, input, .tab-list, .toggle-tabs-btn');
-    if (interactiveElement) {
-         console.log('[Drag Reorder] Drag start ignored on interactive element:', interactiveElement);
-         event.preventDefault(); // Prevent drag start on these elements
-         return;
+    const interactiveElement = event.target.closest('a, button, input, .tab-list, .toggle-tabs-btn, h2'); // Add h2
+    // Allow drag *only* if the target is NOT interactive OR if it's the h2 and NOT currently being edited
+    if (interactiveElement && (interactiveElement.tagName !== 'H2' || interactiveElement.parentElement.querySelector('.edit-collection-name-input'))) {
+        console.log('[Drag Reorder] Drag start ignored on interactive/editing element:', interactiveElement);
+        event.preventDefault(); return;
     }
-
     const card = event.currentTarget;
     draggedCollectionId = card.dataset.collectionId;
-    // Use text/plain for simple ID transfer, sometimes helps compatibility
     event.dataTransfer.setData('text/plain', draggedCollectionId);
     event.dataTransfer.effectAllowed = 'move';
-
-    // Use a timeout to allow the browser to render the drag image before applying the class
-    setTimeout(() => {
-        card.classList.add('dragging-collection');
-    }, 0);
+    setTimeout(() => card.classList.add('dragging-collection'), 0);
     console.log(`[Drag Reorder] Starting drag for collection ID: ${draggedCollectionId}`);
 }
-
-// newtab.js (Complete Code - Combined Event Handlers Version - Final Part)
-
 function handleCollectionDragEnd(event) {
-    const card = event.currentTarget; // The card that was dragged
+    const card = event.currentTarget;
     console.log(`[Drag Reorder] Ending drag for collection ID: ${draggedCollectionId}`);
-
-    // Clean up styling on the source element AND all potential targets
     card.classList.remove('dragging-collection');
     document.querySelectorAll('.collection-drag-over, .drag-over-target').forEach(el => {
         el.classList.remove('collection-drag-over', 'drag-over-target');
     });
-
-    // Crucially, reset the global tracking variable
     draggedCollectionId = null;
 }
 
-
 // --- Handler for Deleting Individual Tab ---
-async function handleDeleteTab(event) { // (Unchanged)
-    event.stopPropagation(); // Prevent card actions from triggering if clicking 'x'
-    const li = event.currentTarget.closest('.saved-tab-item');
-    if (!li) return;
+async function handleDeleteTab(event) {
+    event.stopPropagation();
+    const li = event.currentTarget.closest('.saved-tab-item'); if (!li) return;
     const tabUrlToDelete = li.dataset.tabUrl;
     const collectionId = li.dataset.collectionId;
     const cardElement = li.closest('.collection-card');
-    if (!tabUrlToDelete || !collectionId || !cardElement) {
-        console.warn('[Delete Tab] Missing data attributes on LI or parent card.');
-        return;
-    }
-
-    console.log(`[Delete Tab] Request: URL ${tabUrlToDelete} from Coll ${collectionId}`);
-
+    if (!tabUrlToDelete || !collectionId || !cardElement) return;
     try {
         const collectionIndex = allCollections.findIndex(c => c.id === collectionId);
-        if (collectionIndex === -1) throw new Error("Collection not found in memory");
+        if (collectionIndex === -1) throw new Error("Collection not found");
         const targetCollection = allCollections[collectionIndex];
-        if (!Array.isArray(targetCollection.tabs)) {
-            console.warn(`[Delete Tab] Collection ${collectionId} has no 'tabs' array.`);
-            targetCollection.tabs = []; // Initialize if missing
-        }
-
+        if (!Array.isArray(targetCollection.tabs)) targetCollection.tabs = [];
         const initialTabCount = targetCollection.tabs.length;
-        // Filter out the tab(s) matching the URL
-        targetCollection.tabs = targetCollection.tabs.filter(t => !(t && t.url === tabUrlToDelete));
-
+        targetCollection.tabs = targetCollection.tabs.filter(t => !(t?.url === tabUrlToDelete));
         if (targetCollection.tabs.length < initialTabCount) {
-             console.log(`[Delete Tab] Removed tab(s) matching URL ${tabUrlToDelete}. New count: ${targetCollection.tabs.length}`);
-             // Update storage only if a change occurred
              await chrome.storage.local.set({ tabCollections: allCollections });
-             console.log('[Delete Tab] Storage updated.');
-
-             // Re-render tabs within the card using its stored function
              const renderFunc = cardElement.__renderTabsFunc;
-             if(renderFunc) {
-                  const shouldShowAll = cardElement.querySelector('.toggle-tabs-btn')?.getAttribute('aria-expanded') === 'true';
-                  renderFunc(shouldShowAll); // This will update counts via updateCardActionCounts
-             } else {
-                  console.error("[Delete Tab] Render function not found on card after delete!");
-                  // Fallback: Manually remove LI and update count if render func missing
-                  li.remove();
-                  updateCardActionCounts(cardElement, targetCollection.tabs.length);
-             }
+             if(renderFunc) renderFunc(cardElement.querySelector('.toggle-tabs-btn')?.getAttribute('aria-expanded') === 'true');
+             else { console.error("Render func not found"); li.remove(); updateCardActionCounts(cardElement, targetCollection.tabs.length); }
         } else {
-            console.warn(`[Delete Tab] Tab URL ${tabUrlToDelete} not found in collection ${collectionId} to delete.`);
-            // Optionally remove the LI even if data wasn't found, to sync UI
-            li.remove();
-             updateCardActionCounts(cardElement, targetCollection.tabs.length); // Update count even if UI removed manually
+             console.warn(`Tab URL ${tabUrlToDelete} not found in ${collectionId}`);
+             li.remove(); updateCardActionCounts(cardElement, targetCollection.tabs.length);
         }
-    } catch (error) {
-        console.error("[Error] Failed to delete tab:", error);
-        alert("Error deleting tab.");
-    }
+    } catch (error) { console.error("[Error] deleting tab:", error); alert("Error deleting tab."); }
 }
 
 // --- Handlers for Editing Individual Tab Title ---
-function handleEditTabStart(event) { // (Unchanged)
-    console.log('[Edit Tab Debug] handleEditTabStart triggered!');
+function handleEditTabStart(event) {
     event.preventDefault(); event.stopPropagation();
     const linkElement = event.currentTarget;
     const linkContainer = linkElement.parentElement;
     const liElement = linkElement.closest('.saved-tab-item');
     if (!linkContainer || !liElement || linkContainer.querySelector('.edit-tab-input')) return; // Already editing?
-
     const currentTitle = linkElement.textContent;
     const tabUrl = liElement.dataset.tabUrl;
     const collectionId = liElement.dataset.collectionId;
-    console.log(`[Edit Tab] Start: "${currentTitle}" for URL ${tabUrl} in Coll ${collectionId}`);
-    linkElement.style.display = 'none'; // Hide link
+    linkElement.style.display = 'none';
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'edit-tab-input';
+    input.className = 'edit-tab-input'; // Reuse class
     input.value = currentTitle;
-    input.dataset.originalTitle = currentTitle; // Store original
-    input.dataset.tabUrl = tabUrl;             // Store identifiers
+    input.dataset.originalTitle = currentTitle;
+    input.dataset.tabUrl = tabUrl;
     input.dataset.collectionId = collectionId;
-    input.addEventListener('blur', handleEditTabEnd);      // Save on blur
-    input.addEventListener('keydown', handleEditTabKeydown); // Handle Enter/Escape
+    input.addEventListener('blur', handleEditTabEnd);
+    input.addEventListener('keydown', handleEditTabKeydown);
     linkContainer.appendChild(input);
-    input.focus(); input.select(); // Focus and select text
+    input.focus(); input.select();
 }
-
-function handleEditTabKeydown(event) { // (Unchanged)
-    if (event.key === 'Enter') {
-        event.preventDefault(); // Prevent form submission if wrapped in one
-        event.currentTarget.blur(); // Trigger blur event to save/cancel
-    } else if (event.key === 'Escape') {
-        event.currentTarget.removeEventListener('blur', handleEditTabEnd); // Prevent saving on blur
-        cancelTabEdit(event.currentTarget); // Cancel edit immediately
-    }
+function handleEditTabKeydown(event) {
+    if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+    else if (event.key === 'Escape') { event.currentTarget.removeEventListener('blur', handleEditTabEnd); cancelTabEdit(event.currentTarget); }
 }
-
-function handleEditTabEnd(event) { // (Unchanged) - Simple proxy to save
-    saveTabEdit(event.currentTarget);
-}
-
-async function saveTabEdit(inputElement) { // (Unchanged)
+function handleEditTabEnd(event) { saveTabEdit(event.currentTarget); }
+async function saveTabEdit(inputElement) {
     const newTitle = inputElement.value.trim();
     const originalTitle = inputElement.dataset.originalTitle;
     const tabUrl = inputElement.dataset.tabUrl;
     const collectionId = inputElement.dataset.collectionId;
-    console.log(`[Edit Tab] Save attempt. New: "${newTitle}", Orig: "${originalTitle}"`);
     const linkContainer = inputElement.parentElement;
-    const linkElement = linkContainer ? linkContainer.querySelector('a') : null;
-
-    // Cancel if title is empty or unchanged
-    if (newTitle === "" || newTitle === originalTitle) {
-        console.log('[Edit Tab] Title empty or unchanged, cancelling.');
-        cancelTabEdit(inputElement, linkElement);
-        return;
-    }
-
+    const linkElement = linkContainer?.querySelector('a');
+    if (newTitle === "" || newTitle === originalTitle) { cancelTabEdit(inputElement, linkElement); return; }
     try {
         const collectionIndex = allCollections.findIndex(c => c.id === collectionId);
         if (collectionIndex === -1) throw new Error("Collection not found");
         const targetCollection = allCollections[collectionIndex];
         if (!Array.isArray(targetCollection.tabs)) throw new Error("Tabs array missing");
-
-        const tab = targetCollection.tabs.find(t => t && t.url === tabUrl);
-        if (!tab) throw new Error(`Tab with URL ${tabUrl} not found in collection ${collectionId}`);
-
-        tab.title = newTitle; // Update title in memory
-        console.log(`[Edit Tab] Title updated in memory for URL: ${tabUrl}`);
-
-        await chrome.storage.local.set({ tabCollections: allCollections }); // Save updated collections
-        console.log('[Edit Tab] Storage updated.');
-
-        // Update the UI
+        const tab = targetCollection.tabs.find(t => t?.url === tabUrl);
+        if (!tab) throw new Error(`Tab URL ${tabUrl} not found`);
+        tab.title = newTitle;
+        await chrome.storage.local.set({ tabCollections: allCollections });
         if (linkElement) {
             linkElement.textContent = newTitle;
-            linkElement.title = `${newTitle}\n${tabUrl || 'No URL'}`; // Update tooltip
-            linkElement.style.display = ''; // Show link again
+            linkElement.title = `${newTitle}\n${tabUrl || 'No URL'}`;
+            linkElement.style.display = '';
         }
-        inputElement.remove(); // Remove the input field
+        inputElement.remove();
+    } catch (error) { console.error("[Error] saving tab title:", error); alert("Error saving tab title."); cancelTabEdit(inputElement, linkElement); }
+}
+function cancelTabEdit(inputElement, linkElement = null) {
+    if (!linkElement && inputElement.parentElement) linkElement = inputElement.parentElement.querySelector('a');
+    if (linkElement) linkElement.style.display = '';
+    try { inputElement.remove(); } catch(e) { /* ignore */ }
+}
 
-    } catch (error) {
-        console.error("[Error] Failed to save edited tab title:", error);
-        alert("Error saving tab title.");
-        cancelTabEdit(inputElement, linkElement); // Revert UI on error
+// --- **** NEW Handlers for Editing Collection Name **** ---
+function handleEditCollectionNameStart(event) {
+    event.stopPropagation(); // Prevent card drag/actions
+    const titleElement = event.currentTarget; // The H2 element
+    const cardElement = titleElement.closest('.collection-card');
+    if (!cardElement || cardElement.querySelector('.edit-collection-name-input')) return; // Already editing?
+
+    const collectionId = cardElement.dataset.collectionId;
+    const currentName = titleElement.textContent;
+    console.log(`[Edit Collection] Start: "${currentName}" for Coll ${collectionId}`);
+
+    titleElement.style.display = 'none'; // Hide H2
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    // Add a specific class for potential styling, but reuse base styles
+    input.className = 'edit-tab-input edit-collection-name-input';
+    input.value = currentName;
+    input.dataset.originalName = currentName;
+    input.dataset.collectionId = collectionId;
+
+    input.addEventListener('blur', handleEditCollectionNameEnd); // Save on blur
+    input.addEventListener('keydown', handleEditCollectionNameKeydown); // Handle Enter/Escape
+
+    // Insert the input *after* the H2 element in the DOM
+    titleElement.insertAdjacentElement('afterend', input);
+    input.focus();
+    input.select();
+}
+
+function handleEditCollectionNameKeydown(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        event.currentTarget.blur(); // Trigger save/cancel via blur
+    } else if (event.key === 'Escape') {
+        // Important: remove blur listener *before* calling cancel to prevent saving
+        event.currentTarget.removeEventListener('blur', handleEditCollectionNameEnd);
+        cancelCollectionNameEdit(event.currentTarget);
     }
 }
 
-function cancelTabEdit(inputElement, linkElement = null) { // (Unchanged)
-    console.log('[Edit Tab] Cancelling edit.');
-    // If linkElement wasn't passed, try to find it
-    if (!linkElement && inputElement.parentElement) {
-        linkElement = inputElement.parentElement.querySelector('a');
+function handleEditCollectionNameEnd(event) {
+    // Simply triggers the save function when the input loses focus
+    saveCollectionNameEdit(event.currentTarget);
+}
+
+async function saveCollectionNameEdit(inputElement) {
+    const newName = inputElement.value.trim();
+    const originalName = inputElement.dataset.originalName;
+    const collectionId = inputElement.dataset.collectionId;
+    const cardElement = inputElement.closest('.collection-card');
+    const titleElement = cardElement ? cardElement.querySelector('h2') : null;
+
+    console.log(`[Edit Collection] Save attempt. New: "${newName}", Orig: "${originalName}"`);
+
+    // Validate: Cancel if empty or unchanged
+    if (newName === "" || newName === originalName) {
+        console.log('[Edit Collection] Name empty or unchanged, cancelling.');
+        cancelCollectionNameEdit(inputElement, titleElement);
+        return;
     }
-    // Show the original link again
-    if (linkElement) {
-        linkElement.style.display = '';
+
+    try {
+        // Find the collection in the master list
+        const collectionIndex = allCollections.findIndex(c => c.id === collectionId);
+        if (collectionIndex === -1) {
+            throw new Error(`Collection with ID ${collectionId} not found in allCollections.`);
+        }
+
+        // Update the name in the master list
+        allCollections[collectionIndex].name = newName;
+        console.log(`[Edit Collection] Name updated in memory for ID: ${collectionId}`);
+
+        // Save the entire updated list back to storage
+        await chrome.storage.local.set({ tabCollections: allCollections });
+        console.log('[Edit Collection] Storage updated.');
+
+        // Update the UI
+        if (titleElement) {
+            titleElement.textContent = newName; // Update the H2 text
+        }
+        // Clean up UI (show H2, remove input) handled in cancel implicitly
+        cancelCollectionNameEdit(inputElement, titleElement); // Reuse cancel to clean up UI
+
+    } catch (error) {
+        console.error("[Error] Failed to save edited collection name:", error);
+        alert("Error saving collection name. Check console.");
+        // Revert UI on error by calling cancel
+        cancelCollectionNameEdit(inputElement, titleElement);
     }
+}
+
+function cancelCollectionNameEdit(inputElement, titleElement = null) {
+    console.log('[Edit Collection] Cleaning up edit UI.');
+    const cardElement = inputElement.closest('.collection-card');
+    // If titleElement wasn't passed, try to find it
+    if (!titleElement && cardElement) {
+        titleElement = cardElement.querySelector('h2');
+    }
+
+    // Show the H2 element again
+    if (titleElement) {
+        titleElement.style.display = '';
+    }
+
     // Remove the input field safely
     try {
         inputElement.remove();
     } catch(e) {
-        // Ignore if already removed
+        // Ignore if already removed, e.g., during rapid clicks/blurs
     }
 }
+// --- **** END Handlers for Editing Collection Name **** ---
 
 
-// --- Sidebar Save Action ---
-async function handleSaveOpenTabs() { // (Unchanged logic, adds to start of allCollections)
-    console.log('[Action] Save Open Tabs button clicked.');
+// --- Sidebar Actions ---
+async function handleSaveOpenTabs() {
     if (!currentWindowId) { setSidebarStatus("Error: No window ID.", 'error', 4000); return; }
-
-    const collectionName = prompt("Enter name for the new collection:", `Collection ${new Date().toLocaleDateString()}`); // Suggest a name
-    if (collectionName === null || collectionName.trim() === "") { // Handle empty/cancel prompt
-        setStatus("Save cancelled.", 'info', 3000);
-        return;
-    }
+    const collectionName = prompt("Enter name for the new collection:", `Collection ${new Date().toLocaleDateString()}`);
+    if (collectionName === null || collectionName.trim() === "") { setSidebarStatus("Save cancelled.", 'info', 3000); return; }
     const finalName = collectionName.trim();
-
     setSidebarStatus('Saving...', 'info');
     if(saveOpenTabsBtn) saveOpenTabsBtn.disabled = true;
-
     try {
         const tabs = await chrome.tabs.query({ windowId: currentWindowId });
         const tabsToSave = tabs
-            .filter(tab => tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:') && !tab.pinned)
-            .map(tab => ({
-                title: tab.title || tab.url.split('/')[2] || 'Untitled',
-                url: tab.url,
-                favIconUrl: tab.favIconUrl || null // Store favicon
-            }));
-
-        if (tabsToSave.length === 0) {
-             setSidebarStatus('No relevant tabs to save.', 'warning', 4000); // Use warning
-             throw new Error("No tabs"); // Still throw to break execution
-        }
-
-        const newCollection = {
-            id: Date.now().toString(), // Simple unique enough ID
-            name: finalName,
-            createdAt: new Date().toISOString(), // Track creation time
-            tabs: tabsToSave
-        };
-
-        // Add to the beginning of the main array (newest first by default for *new* saves)
-        allCollections.unshift(newCollection); // Add to start
-
-        // Save the updated array (with new item at the start)
+            .filter(t => t.url && !t.url.startsWith('chrome://') && !t.url.startsWith('about:') && !t.pinned)
+            .map(t => ({ title: t.title||t.url.split('/')[2]||'Untitled', url: t.url, favIconUrl: t.favIconUrl||null }));
+        if (tabsToSave.length === 0) { setSidebarStatus('No relevant tabs to save.', 'warning', 4000); throw new Error("No tabs"); }
+        const newCollection = { id: Date.now().toString(), name: finalName, createdAt: new Date().toISOString(), tabs: tabsToSave };
+        allCollections.unshift(newCollection);
         await chrome.storage.local.set({ tabCollections: allCollections });
-        console.log('[Save Sidebar] Saved to storage. New collection ID:', newCollection.id);
-
-        // Re-render main grid, applying current filter
         displayCollections(filterCollections(allCollections, currentFilter));
-
         let closedTabs = false;
-        if (closeOpenTabsCheckbox && closeOpenTabsCheckbox.checked) {
-            // Get IDs of the tabs that were actually saved
+        if (closeOpenTabsCheckbox?.checked) {
             const savedUrls = new Set(tabsToSave.map(t => t.url));
-            const tabIdsToClose = tabs
-                .filter(t => t.url && savedUrls.has(t.url)) // Filter tabs whose URLs were saved
-                .map(t => t.id);
-            if (tabIdsToClose.length > 0) {
-                 await chrome.tabs.remove(tabIdsToClose);
-                 closedTabs = true;
-                 console.log('[Save Sidebar] Closed', tabIdsToClose.length, 'tabs.');
-            }
+            const tabIdsToClose = tabs.filter(t => t.id && t.url && savedUrls.has(t.url)).map(t => t.id);
+            if (tabIdsToClose.length > 0) { await chrome.tabs.remove(tabIdsToClose); closedTabs = true; }
         }
-
         setSidebarStatus(`Saved "${finalName}"!`, 'success', 3000);
-        if (closedTabs) {
-            await displayOpenTabs(); // Refresh sidebar list if tabs were closed
-        }
-        // Optionally clear checkbox
-        // if (closeOpenTabsCheckbox) closeOpenTabsCheckbox.checked = false;
-
+        if (closedTabs) await displayOpenTabs();
+    } catch (error) { if (error.message !== "No tabs") { console.error("[Error] saving open tabs:", error); setSidebarStatus("Error saving.", 'error', 5000); } }
+    finally { if(saveOpenTabsBtn) saveOpenTabsBtn.disabled = false; }
+}
+async function handleAddNewCollection() {
+    const collectionName = prompt("Enter name for the new empty collection:", "");
+    if (collectionName === null) { setSidebarStatus("Create cancelled.", 'info', 3000); return; }
+    const finalName = collectionName.trim();
+    if (finalName === "") { setSidebarStatus("Name cannot be empty.", 'warning', 3000); return; }
+    if (addNewCollectionBtn) addNewCollectionBtn.disabled = true;
+    setSidebarStatus('Creating...', 'info');
+    let newCollection; // Define here for potential revert in error
+    try {
+        newCollection = { id: Date.now().toString(), name: finalName, createdAt: new Date().toISOString(), tabs: [] };
+        allCollections.unshift(newCollection);
+        await chrome.storage.local.set({ tabCollections: allCollections });
+        displayCollections(filterCollections(allCollections, currentFilter));
+        setSidebarStatus(`Created "${finalName}"!`, 'success', 3000);
+        setTimeout(() => {
+            const newCard = collectionsContainer.querySelector(`.collection-card[data-collection-id="${newCollection.id}"]`);
+            if (newCard) newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
     } catch (error) {
-        if (error.message !== "No tabs") { // Avoid double message if error was no tabs found
-             console.error("[Error] Failed to save open tabs:", error);
-             setSidebarStatus("Error saving. Check console.", 'error', 5000);
-        }
+        console.error("[Error] creating empty collection:", error);
+        setSidebarStatus("Error creating.", 'error', 5000);
+        if (newCollection && allCollections[0]?.id === newCollection.id) allCollections.shift(); // Revert add
     } finally {
-         if(saveOpenTabsBtn) saveOpenTabsBtn.disabled = false; // Re-enable button
+        if (addNewCollectionBtn) addNewCollectionBtn.disabled = false;
     }
 }
-
-// Helper for Sidebar Status Messages
-function setSidebarStatus(message, type = 'info', duration = 0) { // (Unchanged)
+function setSidebarStatus(message, type = 'info', duration = 0) {
     if (!sidebarStatusDiv) return;
+    if (sidebarStatusDiv.timerId) clearTimeout(sidebarStatusDiv.timerId);
     sidebarStatusDiv.textContent = message;
-    sidebarStatusDiv.className = `status-message status-${type}`; // Ensure class corresponds to styles.css
-    // Clear message after duration
+    sidebarStatusDiv.className = `status-message status-${type}`;
     if (duration > 0) {
-        // Use a timeout to clear the message
-        setTimeout(() => {
-            // Only clear if the message hasn't changed in the meantime
+        sidebarStatusDiv.timerId = setTimeout(() => {
             if (sidebarStatusDiv.textContent === message) {
-                 sidebarStatusDiv.textContent = '';
-                 sidebarStatusDiv.className = 'status-message';
+                 sidebarStatusDiv.textContent = ''; sidebarStatusDiv.className = 'status-message'; sidebarStatusDiv.timerId = null;
             }
         }, duration);
     }
 }
 
 // --- Collection Actions (Open/Delete) ---
-async function openCollection(collection) { // (Unchanged)
-   console.log(`[Action] Opening collection: ${collection.name} (ID: ${collection.id})`);
+async function openCollection(collection) {
    const tabsToOpen = collection.tabs || [];
-   if (tabsToOpen.length === 0) {
-       console.log('[Action] Collection is empty, not opening tabs.');
-       return; // Don't open anything if empty
-   }
+   if (tabsToOpen.length === 0) { alert(`Collection "${collection.name}" is empty.`); return; }
    for (const tab of tabsToOpen) {
-       if (tab && tab.url) {
-          try {
-              // Open tabs in the background
-              await chrome.tabs.create({ url: tab.url, active: false });
-          }
-          catch (error) {
-              console.error(`[Error] Failed to open tab: ${tab.url}`, error);
-              // Maybe show a notification to the user?
-          }
-       } else {
-           console.warn('[Warn] Skipping tab with missing URL:', tab);
-       }
+       if (tab?.url) {
+          try { await chrome.tabs.create({ url: tab.url, active: false }); }
+          catch (error) { console.error(`Error opening tab: ${tab.url}`, error); alert(`Error opening: ${tab.title||tab.url}`); }
+       } else { console.warn('Skipping tab missing URL:', tab); }
    }
-   // Attempt to focus the window where tabs were opened (best effort)
    try {
       const window = await chrome.windows.getCurrent({ populate: false });
-      if (window && window.id) {
-          await chrome.windows.update(window.id, { focused: true });
-      }
-   } catch(e) {
-       console.warn('[Warn] Could not focus window after opening tabs.', e)
-   }
+      if (window?.id) await chrome.windows.update(window.id, { focused: true });
+   } catch(e) { console.warn('Could not focus window.', e) }
 }
-
-async function deleteCollection(collectionId, collectionName) { // (Unchanged logic)
-    console.log(`[Action] Attempting to delete collection: ${collectionName} (${collectionId})`);
-    if (!confirm(`Delete collection "${collectionName}"?\nThis cannot be undone.`)) {
-        console.log('[Action] Delete cancelled by user.');
-        return;
-    }
-
+async function deleteCollection(collectionId, collectionName) {
+    if (!confirm(`Delete collection "${collectionName}"?\nThis cannot be undone.`)) return;
     try {
-        // Filter the collection out of the main array
         const initialLength = allCollections.length;
-        allCollections = allCollections.filter(c => c && c.id !== collectionId);
-
+        allCollections = allCollections.filter(c => c?.id !== collectionId);
         if (allCollections.length < initialLength) {
-            // Save the updated array back to storage
             await chrome.storage.local.set({ tabCollections: allCollections });
-            console.log('[Debug] Storage updated after deleting collection', collectionId);
-             // Re-render the display immediately
-            console.log('[Debug] In-memory list updated. New count:', allCollections.length);
             displayCollections(filterCollections(allCollections, currentFilter));
-            console.log(`[Action] Deleted collection: ${collectionName} (${collectionId})`);
+            setSidebarStatus(`Deleted "${collectionName}"`, 'info', 4000);
         } else {
-            console.warn('[Warn] Collection ID', collectionId, 'not found in memory for deletion.');
-             // Optionally force a reload if state seems inconsistent
-             // await loadInitialCollections();
+            console.warn('Collection ID', collectionId, 'not found for deletion.');
+            setSidebarStatus(`Could not find "${collectionName}"`, 'error', 4000);
         }
-
     } catch (error) {
-        console.error("[Error] during collection deletion:", error);
-        alert("Error deleting collection.");
-         await loadInitialCollections(); // Reload all on error as a recovery measure
+        console.error("[Error] deleting collection:", error);
+        setSidebarStatus(`Error deleting "${collectionName}"`, 'error', 5000);
+         await loadInitialCollections(); // Recover
     }
 }
