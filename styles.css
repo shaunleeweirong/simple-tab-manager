@@ -1,4 +1,4 @@
-/* styles.css (Complete Code with Drag & Drop Styles) */
+/* styles.css (Complete Code with Drag & Drop Styles & Updated Button) */
 
 /* --- Base Variables --- */
 :root {
@@ -298,12 +298,32 @@ a:hover {
     opacity: 0.7;
 }
 
+/* --- Styles for the NEW button --- */
+#addNewCollectionBtn {
+    width: 100%; /* Make it full width like the Save button */
+    margin-top: 10px; /* Add space above it */
+    padding: 10px; /* Consistent padding */
+    font-size: 0.95em; /* Consistent font size */
+
+    /* Style to match saveOpenTabsBtn */
+    background-color: var(--color-primary); /* Use primary blue */
+    color: white; /* Ensure text is white */
+    border: none; /* Ensure no border */
+}
+
+#addNewCollectionBtn:hover:not(:disabled) {
+    background-color: var(--color-primary-dark); /* Use darker blue on hover */
+    /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */ /* Optional shadow */
+}
+/* --- End Styles for the NEW button --- */
+
+
 .sidebar-checkbox-label {
     display: flex;
     align-items: center;
     font-size: 0.9em;
     color: var(--color-text-muted);
-    margin-bottom: 10px;
+    margin-bottom: 10px; /* Adjust margin if needed after adding new button */
     cursor: pointer;
     user-select: none; /* Prevent text selection */
 }
@@ -318,7 +338,7 @@ a:hover {
     font-size: 0.9em;
     text-align: center;
     min-height: 1.2em;
-    margin-top: 5px;
+    margin-top: 15px; /* Ensure space above status message */
     font-weight: 500;
     transition: color 0.3s ease;
 }
@@ -434,12 +454,24 @@ main#collectionsContainer {
 .delete-tab-btn:hover {
     color: var(--color-error);
 }
+/* styles.css */
 
-/* Input field for editing tab titles */
+/* Add this rule near the .edit-tab-input rule */
+
+.edit-collection-name-input {
+    /* Inherits base styles from .edit-tab-input */
+    font-size: 1.2em; /* Match H2 font-size slightly better */
+    font-weight: 600; /* Match H2 weight */
+    margin-bottom: 5px; /* Adjust spacing like H2 */
+    padding: 5px 8px; /* Adjust padding if needed */
+    width: calc(100% - 16px); /* Adjust width based on padding */
+}
+
+/* Ensure the base .edit-tab-input style is suitable */
 .edit-tab-input {
-    width: 100%;
+    width: 100%; /* Or adjust if needed */
     padding: 3px 5px;
-    font-size: inherit;
+    font-size: inherit; /* This will be overridden by the specific class */
     font-family: inherit;
     border: 1px solid var(--color-primary);
     border-radius: 3px;
@@ -741,7 +773,8 @@ main#collectionsContainer {
   box-shadow: none;
 }
 .card-actions button:focus-visible,
-#saveOpenTabsBtn:focus-visible {
+#saveOpenTabsBtn:focus-visible,
+#addNewCollectionBtn:focus-visible { /* Added new button here */
      outline: none; /* Use the box-shadow instead */
      box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.4);
 }

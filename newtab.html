@@ -39,6 +39,11 @@
                 <label class="sidebar-checkbox-label">
                     <input type="checkbox" id="closeOpenTabsCheckbox"> Close tabs after saving
                 </label>
+                <!-- **** Button moved here **** -->
+                <button id="addNewCollectionBtn" class="button">
+                    ✨ Create New Empty Collection
+                </button>
+                <!-- **** End Button **** -->
                 <div id="sidebarStatus" class="status-message"></div> <!-- Status message area -->
             </div>
             <!-- END Save Controls Area -->
@@ -51,7 +56,7 @@
             <!-- Message placeholders need to be inside the container for grid spanning -->
             <p id="loadingMessage" class="state-message">Loading collections...</p>
             <p id="emptyStateMessage" class="state-message" style="display: none;">
-                No collections saved yet.<br>Click on the "?" button at the top left for instructions.
+                No collections saved yet.<br>Use the sidebar actions or drag tabs here to get started.
             </p>
             <p id="noResultsMessage" class="state-message" style="display: none;">
                 No collections or tabs match your search.
@@ -74,9 +79,11 @@
             <ol class="instructions-list">
                 <li>Use the <img src="icons/icon16.png" alt="" class="inline-icon"> extension icon in your toolbar to save your open tabs into a new collection.</li>
                 <li>Click on <button class="button button-inline-example">Save All as Collection</button> in the sidebar to save all open tabs from the current window.</li>
+                <li>Click <button class="button button-inline-example" style="background-color: var(--color-success);">✨ Create New Empty Collection</button> to start a blank collection.</li>
                 <li>Drag tabs from the "Current Window Tabs" list and drop them onto a collection card to add them individually.</li>
                 <li>Hover over a saved tab and click the 'x' button to delete it.</li>
-                <li>Drag and re-arrange the collections to your preference</li>
+                <li>Double-click a saved tab's title to edit it (press Enter to save, Esc to cancel).</li>
+                <li>Drag and re-arrange the collection cards to your preference.</li>
             </ol>
         </div>
     </div>
