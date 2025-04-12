@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Save Tabs</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Popup specific minimal styles */
+        body {
+            width: 280px; /* Slightly wider */
+            padding: 15px;
+            font-family: var(--font-family-base); /* Use variable from styles.css */
+            color: var(--color-text);
+        }
+        h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--color-primary);
+            text-align: center;
+        }
+        input[type="text"] {
+            width: calc(100% - 16px); /* Account for padding */
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 0.95em;
+        }
+         input[type="text"]:focus {
+             border-color: var(--color-primary);
+             outline: none;
+             box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+         }
+        label {
+            display: flex; /* Align checkbox and text */
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        input[type="checkbox"] {
+             margin-right: 8px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+             background-color: var(--color-primary-dark);
+        }
+         button:disabled {
+             background-color: var(--color-disabled);
+             cursor: not-allowed;
+         }
+        /* Make status div more prominent */
+        #status {
+            margin-top: 12px;
+            font-size: 0.9em;
+            text-align: center;
+            min-height: 1.2em; /* Prevent layout shift */
+            font-weight: 500;
+        }
+        .status-success { color: var(--color-success); }
+        .status-error { color: var(--color-error); }
+        .status-info { color: var(--color-text-muted); }
+
+    </style>
+</head>
+<body>
+    <h3>Save Current Window</h3>
+    <input type="text" id="collectionName" placeholder="Enter collection name" required>
+    <label>
+        <input type="checkbox" id="closeTabsCheckbox"> Close tabs after saving
+    </label>
+    <button id="saveButton">Save Collection</button>
+    <!-- Status div using classes for color -->
+    <div id="status" class=""></div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

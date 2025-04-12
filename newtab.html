@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"> <!-- Specify character encoding -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsive viewport -->
+    <title>Tab Collections</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="app-header">
+        <div class="logo-title-container">
+             <img src="icons/icon48.png" alt="Tab Manager Logo" class="logo">
+             <h1>My Tab Collections</h1>
+             <!-- Instructions Button -->
+             <button id="showInstructionsBtn" class="icon-button" title="Show Instructions" aria-label="Show Instructions">?</button>
+        </div>
+        <div class="search-container">
+            <input type="search" id="searchInput" placeholder="Search collections & tabs...">
+        </div>
+    </header>
+
+    <!-- Wrapper for two-column layout -->
+    <div class="main-content-wrapper">
+
+        <!-- Sidebar for Open Tabs -->
+        <aside id="openTabsSidebar">
+            <h2>Current Window Tabs</h2>
+            <ul id="openTabsList">
+                <!-- List items will be added by JavaScript -->
+                <li class="state-message">Loading open tabs...</li>
+            </ul>
+
+            <!-- Save Controls Area -->
+            <div class="sidebar-actions">
+                <button id="saveOpenTabsBtn" class="button">Save All as Collection</button>
+                <label class="sidebar-checkbox-label">
+                    <input type="checkbox" id="closeOpenTabsCheckbox"> Close tabs after saving
+                </label>
+                <div id="sidebarStatus" class="status-message"></div> <!-- Status message area -->
+            </div>
+            <!-- END Save Controls Area -->
+
+        </aside>
+        <!-- END Sidebar -->
+
+        <!-- Main Content Area -->
+        <main id="collectionsContainer">
+            <!-- Message placeholders need to be inside the container for grid spanning -->
+            <p id="loadingMessage" class="state-message">Loading collections...</p>
+            <p id="emptyStateMessage" class="state-message" style="display: none;">
+                No collections saved yet.<br>Click on the "?" button at the top left for instructions.
+            </p>
+            <p id="noResultsMessage" class="state-message" style="display: none;">
+                No collections or tabs match your search.
+            </p>
+            <!-- Collection cards are appended here by JS before the message elements -->
+        </main>
+        <!-- END Main Content Area -->
+
+    </div> <!-- End main-content-wrapper -->
+
+    <footer>
+        <!-- Footer content if needed -->
+    </footer>
+
+    <!-- Popup HTML Structure -->
+    <div id="instructionsPopup" class="popup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="instructionsTitle">
+        <div class="popup-content">
+            <button class="popup-close-btn" title="Close" aria-label="Close">×</button>
+            <h2 id="instructionsTitle">How to Use Shaun's Tab Manager</h2>
+            <ol class="instructions-list">
+                <li>Use the <img src="icons/icon16.png" alt="" class="inline-icon"> extension icon in your toolbar to save your open tabs into a new collection.</li>
+                <li>Click on <button class="button button-inline-example">Save All as Collection</button> in the sidebar to save all open tabs from the current window.</li>
+                <li>Drag tabs from the "Current Window Tabs" list and drop them onto a collection card to add them individually.</li>
+                <li>Hover over a saved tab and click the 'x' button to delete it.</li>
+                <li>Drag and re-arrange the collections to your preference</li>
+            </ol>
+        </div>
+    </div>
+    <!-- END Popup HTML Structure -->
+
+    <script src="newtab.js"></script>
+</body>
+</html>
